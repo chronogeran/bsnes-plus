@@ -3,19 +3,16 @@ struct Opcode {
     FLAG_BRA = 0x01, // jumps and unconditional branches
     FLAG_BRA_CONTINUE = 0x02, // calls and conditional branches
     FLAG_INDIRECT = 0x04, // indirect memory accesses
-    FLAG_RESET_P = 0x10, // clears P flag
-    FLAG_SET_P = 0x20, // sets P flag
-    FLAG_PUSH_P = 0x100, // pushes flags
-    FLAG_POP_P = 0x200, // pops flags
-    FLAG_CALL = 0x400, // performs call
-    FLAG_RETURN = 0x800, // returns from call
-    FLAG_BRK = 0x1000, // software interrupt
-    FLAG_HALT = 0x2000, // sleep/stop
+    FLAG_PUSH_F = 0x10, // pushes flags
+    FLAG_POP_F = 0x20, // pops flags
+    FLAG_CALL = 0x40, // performs call
+    FLAG_RETURN = 0x80, // returns from call (unconditionally)
   };
 
-  void set(uint16 flags, uint8 optype, const char *opcode, uint8 (&param)[3], uint8 paramsize=0) {
+  void set(uint16 flags, uint8 optype1, uint8 optype2, const char *opcode, uint8 (&param)[3], uint8 paramsize=0) {
     this->flags = flags;
-    this->optype = optype;
+    this->optype[0] = optype1;
+    this->optype[1] = optype2;
     this->opcode = opcode;
 
     this->param[0] = param[0];
@@ -31,12 +28,8 @@ struct Opcode {
   inline bool isBra() const { return flags & FLAG_BRA; }
   inline bool isBraWithContinue() const { return flags & FLAG_BRA_CONTINUE; }
   inline bool isIndirect() const { return flags & FLAG_INDIRECT; }
-  inline bool resetsP() const { return flags & FLAG_RESET_P; }
-  inline bool setsP() const { return flags & FLAG_SET_P; }
-  inline bool pushesP() const { return flags & FLAG_PUSH_P; }
-  inline bool popsP() const { return flags & FLAG_POP_P; }
-  inline bool breaks() const { return flags & FLAG_BRK; }
-  inline bool halts() const { return flags & FLAG_HALT; }
+  inline bool pushesF() const { return flags & FLAG_PUSH_F; }
+  inline bool popsF() const { return flags & FLAG_POP_F; }
   inline bool isCall() const { return flags & FLAG_CALL; }
   inline bool returns() const { return flags & FLAG_RETURN; }
 
@@ -62,15 +55,15 @@ struct Opcode {
   }
 
   uint16 flags;
-  uint8 optype;
+  uint8 optype[2];
   uint8 param[3];
   uint8 paramsize;
   const char *opcode;
 };
 
-void disassemble_opcode(char *output, uint16 addr);
-void disassemble_opcode_ex(Opcode &opcode, uint16 addr);
+void disassemble_opcode(char *output, uint24 addr);
+void disassemble_opcode_ex(Opcode &opcode, uint24 addr);
 inline uint8 dreadb(uint16 addr);
 inline uint16 dreadw(uint16 addr);
 inline uint16 relb(int8 offset, int op_len, uint16 pc);
-uint16 decode(uint8 offset_type, uint16 addr, uint16 pc);
+uint24 decode(uint8 offset_type, uint16 addr, uint16 pc);

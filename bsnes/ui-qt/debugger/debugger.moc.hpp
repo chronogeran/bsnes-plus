@@ -47,6 +47,7 @@ public:
   class SymbolMap *symbolsSA1;
   class SymbolMap *symbolsSMP;
   class SymbolMap *symbolsDSP;
+  class SymbolMap *symbolsSGB;
 
   void modifySystemState(unsigned);
   void echo(const char *message);
@@ -55,6 +56,8 @@ public:
   Debugger();
 
 public slots:
+  void hide();
+
   void clear();
   void synchronize();
   void frameTick();
@@ -69,6 +72,9 @@ public slots:
   void stepToIRQAction();
   void createMemoryEditor();
 
+protected:
+  void closeEvent(QCloseEvent *event);
+
 private:
   inline void switchWindow();
 
@@ -79,6 +85,7 @@ private:
   string defaultSymbolsSMP;
   string defaultSymbolsDSP;
   string defaultSymbolsSA1;
+  string defaultSymbolsSGB;
 };
 
 extern Debugger *debugger;

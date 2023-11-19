@@ -1,16 +1,16 @@
 #include "breakpoint.moc"
 BreakpointEditor *breakpointEditor;
 
-SymbolItemModel::SymbolItemModel(SymbolMap *symbols, QObject *parent)
+SymbolItemModel::SymbolItemModel(SymbolMap *map, QObject *parent)
   : QStandardItemModel(parent) {
 
-  for (int i = 0; i < symbols->symbols.size(); i++) {
-    Symbol symbol = symbols->symbols[i].getSymbol();
+  foreach(symbols, map->symbols) {
+    Symbol symbol = symbols.getSymbol();
     if (!symbol.isSymbol()) continue;
     
     QStandardItem *item = new QStandardItem();
-    item->setText(QString::asprintf("%06x %s", symbol.address, symbol.name()));
-    item->setData(symbol.address);
+    item->setText(QString::asprintf("%06x %s", symbols.address, symbol.name()));
+    item->setData(symbols.address);
     appendRow(item);
   }
 }
@@ -121,6 +121,9 @@ QString BreakpointModel::displayAddr(unsigned addr, SNES::Debugger::Breakpoint::
   case SNES::Debugger::Breakpoint::Source::SFXBus:
     symbolMap = debugger->symbolsSFX;
     break;
+  case SNES::Debugger::Breakpoint::Source::SGBBus:
+    symbolMap = debugger->symbolsSGB;
+    break;
   }
   
   if (symbolMap) {
@@ -180,6 +183,8 @@ QVariant BreakpointModel::data(const QModelIndex &index, int role) const {
       return QVariant::fromValue(debugger->symbolsSA1);
     case SNES::Debugger::Breakpoint::Source::SFXBus:
       return QVariant::fromValue(debugger->symbolsSFX);
+    case SNES::Debugger::Breakpoint::Source::SGBBus:
+      return QVariant::fromValue(debugger->symbolsSGB);
     }
   }
 
@@ -385,6 +390,11 @@ BreakpointEditor::BreakpointEditor() {
   breakOnBRK->setChecked(SNES::debugger.break_on_brk);
   connect(breakOnBRK, SIGNAL(toggled(bool)), this, SLOT(toggle()));
   layout->addWidget(breakOnBRK);
+
+  logWithoutBreak = new QCheckBox("Log breakpoints without breaking");
+  logWithoutBreak->setChecked(SNES::debugger.log_without_break);
+  connect(logWithoutBreak, SIGNAL(toggled(bool)), this, SLOT(toggle()));
+  layout->addWidget(logWithoutBreak);
 }
 
 void BreakpointEditor::add() {
@@ -393,7 +403,7 @@ void BreakpointEditor::add() {
 
 void BreakpointEditor::remove() {
   QModelIndexList selected = table->selectionModel()->selectedRows();
-  qSort(selected);
+  std::sort(selected.begin(), selected.end());
   if (selected.count() > 0) {
     model->removeRows(selected[0].row(), selected.count());
   }
@@ -402,6 +412,7 @@ void BreakpointEditor::remove() {
 void BreakpointEditor::toggle() {
   SNES::debugger.break_on_brk = breakOnBRK->isChecked();
   SNES::debugger.break_on_wdm = breakOnWDM->isChecked();
+  SNES::debugger.log_without_break = logWithoutBreak->isChecked();
 }
 
 void BreakpointEditor::clear() {
@@ -435,7 +446,8 @@ void BreakpointEditor::addBreakpoint(const string& addr, const string& mode, con
     // Try to find a comparison operator.
     // Search in reverse through the available ones so that two-character operators (!=, <=, >=) get found first
     for (int i = BreakpointModel::compares.count() - 1; i >= 0; i--) {
-      const char *oper = BreakpointModel::compares[i].toUtf8().constData();
+      auto data = BreakpointModel::compares[i].toUtf8();
+      const char *oper = data.constData();
       if (addr.position(oper)) {
         addresses.split<2>(oper, addr);
         model->setData(model->index(row, BreakpointModel::BreakCompare), i);

@@ -34,7 +34,7 @@ void DisassemblerView::init() {
 void DisassemblerView::setFont(const QFont &font) {
   QWidget::setFont(font);
 
-  charWidth = fontMetrics().width(QLatin1Char('2'));
+  charWidth = fontMetrics().horizontalAdvance(QLatin1Char('2'));
   charHeight = fontMetrics().height() + 1;
   charPadding = charWidth / 2;
   headerHeight = charHeight + 3;
@@ -144,7 +144,7 @@ void DisassemblerView::updateVisibleLines() {
     if (stopped || line < emptyRowsAround || line >= maxLines - emptyRowsAround) {
       lines[index].line.setEmpty();
     } else {
-      uint32_t currentAddress = address;
+      uint32_t currentLineAddress = address;
 
       if (first) {
         topLineAddress = address;
@@ -159,13 +159,13 @@ void DisassemblerView::updateVisibleLines() {
         rop.flags |= RenderableDisassemblerLine::FLAG_RETURN;
       }
 
-      if (op.isBra() && op.targetAddress < currentAddress && op.targetAddress >= currentRangeStartAddress) {
+      if (op.isBra() && op.targetAddress < currentLineAddress && op.targetAddress >= currentRangeStartAddress) {
         createLoopUpwards(index, op.targetAddress);
       }
 
       bottomLineAddress = address;
       
-      if (address == currentAddress) {
+      if (address == currentLineAddress) {
         stopped = true; // no next instruction found
       }
     }
@@ -195,6 +195,8 @@ void DisassemblerView::updateLines() {
 void DisassemblerView::updateLineRange() {
   uint32_t currentAddressLine;
   processor->findKnownRange(currentAddress, currentRangeStartAddress, currentRangeEndAddress, currentAddressLine, currentRangeLineNumbers);
+  // do an extra analysis pass to catch code around branches that may not have run yet, etc
+  processor->analyze(currentRangeStartAddress);
 
   verticalScrollBar()->setRange(0, currentRangeLineNumbers + emptyRowsAround + emptyRowsAround - rowsShown);
   verticalScrollBar()->setPageStep(rowsShown);
@@ -687,6 +689,14 @@ int DisassemblerView::renderValue(QPainter &painter, int x, int y, uint8_t type,
       text = QString("$%1").arg(value, size, 16, QChar('0'));
       break;
 
+    case 'D':
+      text = QString("%1").arg((int32_t)value, size, 10, QChar('0'));
+      break;
+    
+    case 'U':
+      text = QString("%1").arg(value, size, 10, QChar('0'));
+      break;
+
     default:
       text = "???";
       break;
@@ -709,7 +719,7 @@ void DisassemblerView::paintHeader(QPainter &painter) {
 
   painter.setPen(Qt::black);
   SET_CLIPPING(1);
-  painter.drawText(columnPositions[1] + charPadding, headerHeight - charPadding, "Disassemble");
+  painter.drawText(columnPositions[1] + charPadding, headerHeight - charPadding, "Disassembly");
   SET_CLIPPING(2);
   painter.drawText(columnPositions[2] + charPadding, headerHeight - charPadding, "Comment");
   NO_CLIPPING();
